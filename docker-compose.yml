@@ -1,0 +1,80 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# LangGraph + OpenWebUI 통합 스택
+#
+# 서비스:
+#   backend   - FastAPI + LangGraph (포트 8000)
+#   openwebui - OpenWebUI 프론트엔드 (포트 3000)
+#   postgres  - 대화 히스토리 영속 저장 (선택)
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── LangGraph 백엔드 ──────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: langgraph-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      # 개발 중 핫리로드를 위해 소스 마운트 (프로덕션에서는 제거)
+      - ./backend:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── OpenWebUI 프론트엔드 ─────────────────────────────────────────────────
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:v0.8.10
+    container_name: openwebui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      ENABLE_OLLAMA_API: "false"
+      OPENAI_API_BASE_URL: "http://backend:8000/v1"
+      OPENAI_API_KEY: "${API_KEY:-sk-langgraph-local}"
+      WEBUI_SECRET_KEY: "${WEBUI_SECRET_KEY:-change-me-in-production}"
+      WEBUI_AUTH: "${WEBUI_AUTH:-false}"
+      DATA_DIR: /app/backend/data
+    volumes:
+      - openwebui-data:/app/backend/data
+    depends_on:
+      backend:
+        condition: service_started
+
+  # ── PostgreSQL (선택: 영속 저장소) ────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: langgraph-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-langgraph}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-langgraph}"
+      POSTGRES_DB: "${POSTGRES_DB:-langgraph}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-langgraph}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - with-postgres  # docker compose --profile with-postgres up
+
+volumes:
+  openwebui-data:
+  postgres-data:
+
+networks:
+  default:
+    name: langgraph-network
