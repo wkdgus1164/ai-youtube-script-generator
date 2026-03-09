@@ -1,7 +1,9 @@
 """Integration tests for FastAPI endpoints."""
 from __future__ import annotations
 
-import pytest
+from fastapi.testclient import TestClient
+
+from main import app
 
 
 def test_health_endpoint(client):
@@ -18,16 +20,19 @@ def test_models_endpoint_returns_registered_models(client):
     data = resp.json()
     assert data["object"] == "list"
     model_ids = [m["id"] for m in data["data"]]
-    # At minimum the three built-in graphs should be present
-    assert "assistant-general" in model_ids
-    assert "assistant-research" in model_ids
-    assert "assistant-dev" in model_ids
+    assert model_ids == ["youtube-script-writer"]
+
+
+def test_model_detail_endpoint_only_exposes_script_writer_model(client):
+    visible = client.get("/v1/models/youtube-script-writer")
+    assert visible.status_code == 200
+    assert visible.json()["id"] == "youtube-script-writer"
+
+    hidden = client.get("/v1/models/gpt-5-nano")
+    assert hidden.status_code == 404
 
 
 def test_models_endpoint_requires_auth():
-    from fastapi.testclient import TestClient
-    from main import app
-
     with TestClient(app) as c:
         resp = c.get("/v1/models")  # No auth header
     assert resp.status_code == 401

@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # ── LLM Provider Keys ─────────────────────────────────────────
     openai_api_key: str = ""
     anthropic_api_key: str | None = None
-    default_llm_model: str = "gpt-4o-mini"
+    default_llm_model: str = "gpt-5-nano"
 
     # ── LangSmith (optional) ──────────────────────────────────────
     langchain_api_key: str | None = None
@@ -33,7 +33,10 @@ class Settings(BaseSettings):
     api_key: str = "sk-langgraph-local"
 
     # ── Timeout ───────────────────────────────────────────────────
-    request_timeout: int = 60
+    request_timeout: int | None = None
+
+    # ── Script Writer Prompt Store ────────────────────────────────
+    script_writer_prompt_store_path: str = "data/script_writer_prompts.json"
 
     # ── Tavily (assistant-research tool) ──────────────────────────
     tavily_api_key: str | None = None
@@ -43,10 +46,19 @@ class Settings(BaseSettings):
     # TODO(template-user): Add any provider models you want to expose here,
     # e.g. EXTRA_MODELS=gpt-4o,gpt-4o-mini,claude-opus-4-6
     extra_models: str = ""
+    openwebui_visible_models: str = "youtube-script-writer"
 
     @property
     def extra_models_list(self) -> list[str]:
         return [m.strip() for m in self.extra_models.split(",") if m.strip()]
+
+    @property
+    def openwebui_visible_models_list(self) -> list[str]:
+        return [
+            model_id.strip()
+            for model_id in self.openwebui_visible_models.split(",")
+            if model_id.strip()
+        ]
 
 
 settings = Settings()

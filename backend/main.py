@@ -16,11 +16,19 @@ import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from config import settings
 from converters import convert_messages
 from graphs import get_available_models, get_graph
+from graphs.script_writer.prompt_editor import render_prompt_editor_html
+from graphs.script_writer.prompt_store import (
+    ScriptWriterPromptCollection,
+    ScriptWriterPromptUpdateRequest,
+    list_prompt_configs,
+    reset_prompt_bodies,
+    save_prompt_bodies,
+)
 from models import ChatCompletionRequest, ModelInfo, ModelList
 from streaming import run_graph_sync, stream_graph_response
 
@@ -71,12 +79,56 @@ async def health():
     return {"status": "ok", "time": int(time.time())}
 
 
+def get_openwebui_model_ids() -> list[str]:
+    """Return the curated model list exposed to OpenWebUI."""
+    available = get_available_models()
+    return [
+        model_id
+        for model_id in settings.openwebui_visible_models_list
+        if model_id in available
+    ]
+
+
+@app.get("/script-writer/prompts", response_class=HTMLResponse)
+async def script_writer_prompt_editor() -> HTMLResponse:
+    """Serve the lightweight prompt editor UI used from OpenWebUI."""
+    return HTMLResponse(render_prompt_editor_html())
+
+
+@app.get("/api/script-writer/prompts")
+async def get_script_writer_prompts() -> ScriptWriterPromptCollection:
+    """Return editable script-writer prompt bodies and static runtime settings."""
+    return list_prompt_configs()
+
+
+@app.put("/api/script-writer/prompts")
+async def update_script_writer_prompts(
+    request: ScriptWriterPromptUpdateRequest,
+) -> ScriptWriterPromptCollection:
+    """Persist prompt editor changes for future requests."""
+    return save_prompt_bodies(request.prompts)
+
+
+@app.post("/api/script-writer/prompts/reset")
+async def reset_script_writer_prompts() -> ScriptWriterPromptCollection:
+    """Restore all editable prompts to their defaults."""
+    return reset_prompt_bodies()
+
+
 @app.get("/v1/models", dependencies=[Depends(verify_api_key)])
 async def list_models() -> ModelList:
     """Return models shown in the OpenWebUI model picker."""
     return ModelList(
-        data=[ModelInfo(id=model_id) for model_id in get_available_models()]
+        data=[ModelInfo(id=model_id) for model_id in get_openwebui_model_ids()]
     )
+
+
+@app.get("/v1/models/{model_id}", dependencies=[Depends(verify_api_key)])
+async def get_model(model_id: str) -> ModelInfo:
+    """Return details for a specific model (required by OpenWebUI)."""
+    if model_id not in get_openwebui_model_ids():
+        raise HTTPException(status_code=404, detail=f"Model '{model_id}' not found")
+    return ModelInfo(id=model_id)
 
 
 @app.post("/v1/chat/completions", dependencies=[Depends(verify_api_key)])
