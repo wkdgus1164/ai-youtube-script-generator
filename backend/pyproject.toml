@@ -19,6 +19,8 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     # HTTP
     "httpx>=0.28.0",
+    # YouTube transcript fetching
+    "youtube-transcript-api>=1.0.0",
 ]
 
 [dependency-groups]
