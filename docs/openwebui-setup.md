@@ -8,7 +8,7 @@ cp .env.example .env
 # .env 파일을 열어 OPENAI_API_KEY 등 필수 값 입력
 
 # 2. 스택 실행 (백엔드 + OpenWebUI)
-docker compose up -d
+docker compose up --build -d
 
 # 3. 로그 확인
 docker compose logs -f backend
@@ -30,7 +30,8 @@ OPENAI_API_BASE_URL: "http://backend:8000/v1"
 OPENAI_API_KEY: "sk-langgraph-local"
 ```
 
-컨테이너를 재시작하면 자동으로 적용됩니다.
+백엔드가 healthy 상태가 된 뒤 OpenWebUI가 시작되며, 첫 실행부터 자동으로 적용됩니다.
+또한 Compose는 OpenWebUI 커스텀 이미지를 함께 빌드하므로 Tool Calling 패널의 `Input` JSON도 `Output`처럼 pretty print 됩니다.
 
 ### 방법 B: UI에서 수동 설정
 
@@ -49,9 +50,7 @@ OPENAI_API_KEY: "sk-langgraph-local"
 
 | 모델 ID | 설명 |
 |---------|------|
-| `assistant-general` | 범용 AI 어시스턴트 (도구 없음) |
-| `assistant-research` | 웹 검색 기반 리서치 어시스턴트 |
-| `assistant-dev` | 코드 작성 및 실행 개발 어시스턴트 |
+| `youtube-script-writer` | YouTube URL 또는 원문 텍스트를 일본어 대본으로 변환 |
 
 `EXTRA_MODELS`에 추가한 프로바이더 모델도 여기에 표시됩니다.
 
@@ -65,20 +64,18 @@ OPENAI_API_KEY: "sk-langgraph-local"
     ▼
 OpenWebUI
     │ POST http://backend:8000/v1/chat/completions
-    │ { "model": "assistant-research", "messages": [...], "stream": true }
+    │ { "model": "youtube-script-writer", "messages": [...], "stream": true }
     ▼
 FastAPI backend/main.py
     │ verify_api_key() → 통과
-    │ get_graph("assistant-research") → research 그래프 반환
+    │ get_graph("youtube-script-writer") → script_writer 그래프 반환
     │ convert_messages() → LangChain 메시지로 변환
     │ StreamingResponse(stream_graph_response(...))
     ▼
-LangGraph research.py
-    │ [chat_node] LLM 호출 → tool_call: web_search_tool(...)
+LangGraph script_writer graph
+    │ parse_input → orchestrator → tool loop
     ▼
-    │ [tool_node] 웹 검색 실행 → 결과 반환
-    ▼
-    │ [chat_node] 검색 결과로 최종 답변 생성 (토큰 스트리밍)
+    │ 각 단계 완료 시 OpenWebUI Tool Calling 스타일 패널 스트리밍
     ▼
 FastAPI → SSE 청크 전송 → OpenWebUI → 실시간 렌더링
 ```

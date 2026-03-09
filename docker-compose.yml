@@ -14,7 +14,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: langgraph-backend
     restart: unless-stopped
     env_file: .env
     environment:
@@ -25,8 +24,9 @@ services:
     volumes:
       # 개발 중 핫리로드를 위해 소스 마운트 (프로덕션에서는 제거)
       - ./backend:/app
+    command: ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -34,8 +34,12 @@ services:
 
   # ── OpenWebUI 프론트엔드 ─────────────────────────────────────────────────
   openwebui:
-    image: ghcr.io/open-webui/open-webui:v0.8.10
-    container_name: openwebui
+    build:
+      context: ./openwebui
+      dockerfile: Dockerfile
+      args:
+        OPENWEBUI_BASE_IMAGE: ghcr.io/open-webui/open-webui:v0.8.10
+    image: ai-youtube-script-generator-openwebui
     restart: unless-stopped
     ports:
       - "3000:8080"
@@ -43,14 +47,16 @@ services:
       ENABLE_OLLAMA_API: "false"
       OPENAI_API_BASE_URL: "http://backend:8000/v1"
       OPENAI_API_KEY: "${API_KEY:-sk-langgraph-local}"
+      SCRIPT_WRITER_BACKEND_PUBLIC_URL: "${SCRIPT_WRITER_BACKEND_PUBLIC_URL:-http://localhost:8000}"
       WEBUI_SECRET_KEY: "${WEBUI_SECRET_KEY:-change-me-in-production}"
       WEBUI_AUTH: "${WEBUI_AUTH:-false}"
       DATA_DIR: /app/backend/data
     volumes:
       - openwebui-data:/app/backend/data
+    command: ["bash", "/app/start-codex.sh"]
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
 
   # ── PostgreSQL (선택: 영속 저장소) ────────────────────────────────────────
   postgres:
@@ -74,7 +80,3 @@ services:
 volumes:
   openwebui-data:
   postgres-data:
-
-networks:
-  default:
-    name: langgraph-network

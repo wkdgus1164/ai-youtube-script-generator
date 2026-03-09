@@ -109,10 +109,10 @@ Railway MCP를 통해 AI에게 자연어로 요청할 수 있습니다:
 2. GitHub 계정 연동 후 저장소 선택
 
 ### OpenWebUI 서비스 추가
-> Docker Hub 이미지로 서비스를 추가할 때는 대시보드를 사용합니다.
+> `Input` JSON pretty print 패치를 포함하려면 upstream 이미지를 직접 쓰지 말고 이 저장소의 `openwebui/Dockerfile`로 별도 서비스를 빌드하세요.
 
-1. 프로젝트 → **New Service** → **Docker Image**
-2. Image: `ghcr.io/open-webui/open-webui:main`
+1. 프로젝트 → **New Service** → **Deploy from GitHub repo**
+2. 동일 저장소를 선택한 뒤 OpenWebUI 서비스의 루트/Dockerfile을 `openwebui/Dockerfile`로 지정
 3. Port: `8080`
 4. 환경변수 설정:
    ```

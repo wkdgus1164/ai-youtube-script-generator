@@ -35,3 +35,6 @@ Thumbs.db
 # LangGraph / LangSmith
 .langchain/
 .pytest_cache/
+
+# Runtime prompt overrides
+backend/data/script_writer_prompts.json
